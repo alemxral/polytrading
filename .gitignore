@@ -1,1 +1,2 @@
-backend/credentials.json
+backend/config/credentials.json
+trade.py
