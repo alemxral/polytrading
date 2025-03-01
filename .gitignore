@@ -2,3 +2,4 @@ backend/config/credentials.json
 trade.py
 py_clob_client/
 py_clob_utils/
+markets_all.json
