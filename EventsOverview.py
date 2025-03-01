@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import requests
 from dotenv import load_dotenv
-from initialize_client import default_client
+from ClobClientWrapper import default_client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
