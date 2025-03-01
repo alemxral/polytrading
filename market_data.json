@@ -1,0 +1,386 @@
+{
+  "73195466598131388170821776880758003788512546260802630290144229509026208855089": {
+    "market": "0x320045be25e331375755d9126cbe20a319ace7c7d9258227e3ccdc9267d786a0",
+    "timestamp": "1740822491461",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "826386.14"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "127500"
+    ],
+    "best_sells": [
+      "0.023"
+    ],
+    "best_sells_size": [
+      "1857.41"
+    ],
+    "second_best_sells": [
+      "0.999"
+    ],
+    "second_best_sells_size": [
+      "2111150"
+    ],
+    "logs": {
+      "book": "1740822481488",
+      "price_change": "1740822491461"
+    }
+  },
+  "6856495334599070327400479404766108364224261454141327193457127201769494631355": {
+    "market": "0x405534c03f82e56a397478db7b068dbb683fb46c976265f650ba6510200749da",
+    "timestamp": "1740822492139",
+    "best_buys": [
+      "0.962"
+    ],
+    "best_buys_size": [
+      "53"
+    ],
+    "second_best_buys": [
+      "0.96"
+    ],
+    "second_best_buys_size": [
+      "1000"
+    ],
+    "best_sells": [
+      "0.963"
+    ],
+    "best_sells_size": [
+      "918.91"
+    ],
+    "second_best_sells": [
+      "0.964"
+    ],
+    "second_best_sells_size": [
+      "2466.33"
+    ],
+    "logs": {
+      "book": "1740822443150",
+      "price_change": "1740822492139"
+    }
+  },
+  "107702219978983602967102884794835839587439782377291063516912032944463408076101": {
+    "market": "0x940480935f624dee9e9fa9820159dfdecae3b20b85f9f96a59d54c8fff63daf9",
+    "timestamp": "1740822482070",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "2023051.59"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "865481.41"
+    ],
+    "best_sells": [
+      "0.999"
+    ],
+    "best_sells_size": [
+      "5100000"
+    ],
+    "second_best_sells": [
+      "0.97"
+    ],
+    "second_best_sells_size": [
+      "4250"
+    ],
+    "logs": {
+      "book": "1740822482070",
+      "price_change": "1740822448629"
+    }
+  },
+  "88643218703041538921477211574402135868068849303184796552643053766802615912255": {
+    "market": "0xeba50b6a5e1a5a682c8aaf34152d4eb91e0410d59117392f09ac2fca9735c366",
+    "timestamp": "1740822491440",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "798132.79"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "3037664.51"
+    ],
+    "best_sells": [
+      "0.004"
+    ],
+    "best_sells_size": [
+      "194293.77"
+    ],
+    "second_best_sells": [
+      "0.999"
+    ],
+    "second_best_sells_size": [
+      "5101500"
+    ],
+    "logs": {
+      "book": "1740822483169",
+      "price_change": "1740822491440"
+    }
+  },
+  "7764507923512538708659015611202625912491255010579260037157032917613332967467": {
+    "market": "0x902b551eabdaeaf91d9679365ad4bdf258fbd1b85246dee247b30aa8e3d4f4a2",
+    "timestamp": "1740822481661",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "861112.1"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "745190.84"
+    ],
+    "best_sells": [
+      "0.999"
+    ],
+    "best_sells_size": [
+      "2100000"
+    ],
+    "second_best_sells": [
+      "0.998"
+    ],
+    "second_best_sells_size": [
+      "1000"
+    ],
+    "logs": {
+      "book": "1740822481661",
+      "price_change": "1740822448813"
+    }
+  },
+  "83155643791123528545888271368970103667222416553800192242286164648782617698704": {
+    "market": "0xc69bb8590ecd5f8be946fc6efc4b5783b005e3e121e057f6297fa8e0b8852f1c",
+    "timestamp": "1740822491455",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "1477708"
+    ],
+    "second_best_buys": [
+      ""
+    ],
+    "second_best_buys_size": [
+      ""
+    ],
+    "best_sells": [
+      "0.003"
+    ],
+    "best_sells_size": [
+      "1039970.59"
+    ],
+    "second_best_sells": [
+      "0.955"
+    ],
+    "second_best_sells_size": [
+      "7500"
+    ],
+    "logs": {
+      "book": "1740822482505",
+      "price_change": "1740822491455"
+    }
+  },
+  "20043121189468219599437255198027106640631597812114545269112896531495574826378": {
+    "market": "0xd35868afa9257d08411f4c7d61601213fc3d9fa1ebbc1d963572263904be2616",
+    "timestamp": "1740822491430",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "2381693.89"
+    ],
+    "second_best_buys": [
+      ""
+    ],
+    "second_best_buys_size": [
+      ""
+    ],
+    "best_sells": [
+      "0.003"
+    ],
+    "best_sells_size": [
+      "448992.06"
+    ],
+    "second_best_sells": [
+      "0.999"
+    ],
+    "second_best_sells_size": [
+      "3100000"
+    ],
+    "logs": {
+      "book": "1740822482950",
+      "price_change": "1740822491430"
+    }
+  },
+  "59719086471851132118057103160039200789268717383832814315021216098909788743101": {
+    "market": "0x5fd3d8604616935f40f6e57ba23f1b57ed8550f2a9df09b2c8be044c4c2489b8",
+    "timestamp": "1740822483586",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "4992098.83"
+    ],
+    "second_best_buys": [
+      ""
+    ],
+    "second_best_buys_size": [
+      ""
+    ],
+    "best_sells": [
+      "0.979"
+    ],
+    "best_sells_size": [
+      "2750"
+    ],
+    "second_best_sells": [
+      "0.974"
+    ],
+    "second_best_sells_size": [
+      "8844"
+    ],
+    "logs": {
+      "book": "1740822483586",
+      "price_change": "1740822448490"
+    }
+  },
+  "26236892725262807235372062505277176822581817393263948638256147417812762302719": {
+    "market": "0x341f95039c52c92771e5bc889c2482ef8472bf82a1a5d222051eb0b62a6cf23f",
+    "timestamp": "1740822481862",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "1576466.55"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "642167.48"
+    ],
+    "best_sells": [
+      "0.999"
+    ],
+    "best_sells_size": [
+      "11010000"
+    ],
+    "second_best_sells": [
+      "0.998"
+    ],
+    "second_best_sells_size": [
+      "1500"
+    ],
+    "logs": {
+      "book": "1740822481862",
+      "price_change": "1740822448671"
+    }
+  },
+  "65661592405417984267066437223235056001699463687124602041720003480189576143687": {
+    "market": "0x030ffc12d4619622e3d318526e306008bc1fbf982fe95e92b649c9f40a135ad3",
+    "timestamp": "1740822482718",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "2033507.15"
+    ],
+    "second_best_buys": [
+      ""
+    ],
+    "second_best_buys_size": [
+      ""
+    ],
+    "best_sells": [
+      "1"
+    ],
+    "best_sells_size": [
+      "33620"
+    ],
+    "second_best_sells": [
+      "0.99"
+    ],
+    "second_best_sells_size": [
+      "200"
+    ],
+    "logs": {
+      "book": "1740822482718",
+      "price_change": "1740822448748"
+    }
+  },
+  "61629812628542112006184910806919500871073513586827345300858319585054511894263": {
+    "market": "0xdc42f4785d777459645f7d5373c8f6eddbb30b703e1316ac17c527b22694f1b7",
+    "timestamp": "1740822482285",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "1422591.63"
+    ],
+    "second_best_buys": [
+      ""
+    ],
+    "second_best_buys_size": [
+      ""
+    ],
+    "best_sells": [
+      "1"
+    ],
+    "best_sells_size": [
+      "4970"
+    ],
+    "second_best_sells": [
+      "0.999"
+    ],
+    "second_best_sells_size": [
+      "5110000"
+    ],
+    "logs": {
+      "book": "1740822482285",
+      "price_change": "1740822448800"
+    }
+  },
+  "83156492313921775878087837698449837132415407819948472591171256258102686919964": {
+    "market": "0x951ead358ab84c4314b8a619593471d80c687cc0272015dddac97fa1094b860e",
+    "timestamp": "1740822493600",
+    "best_buys": [
+      "0.001"
+    ],
+    "best_buys_size": [
+      "1399780"
+    ],
+    "second_best_buys": [
+      "0.002"
+    ],
+    "second_best_buys_size": [
+      "3710309.34"
+    ],
+    "best_sells": [
+      "0.003"
+    ],
+    "best_sells_size": [
+      "1100695.66"
+    ],
+    "second_best_sells": [
+      "0.999"
+    ],
+    "second_best_sells_size": [
+      "5100000"
+    ],
+    "logs": {
+      "book": "1740822483371",
+      "price_change": "1740822493600"
+    }
+  }
+}
