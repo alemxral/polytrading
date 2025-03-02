@@ -10,8 +10,14 @@ from datetime import datetime
 
 # --- Configuration & Logging ---
 load_dotenv()  # Load environment variables from .env if available
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# Create and configure the logger.
 logger = logging.getLogger("Wsockt")
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 # Default WebSocket endpoint for market data
 WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
@@ -61,6 +67,7 @@ def load_market_token_ids(filepath=TOKENS_FILE, filters=None):
         logger.error(f"Error loading tokens from {filepath}: {e}")
         return []
 
+
 # --- Base WebSocket Client Class ---
 class BaseWSSClient:
     """
@@ -107,11 +114,33 @@ class BaseWSSClient:
             logger.error(f"[{self.channel_type.upper()}] Failed to send subscription message: {e}")
 
     async def listen(self):
-        """Continuously listens for incoming messages and processes them."""
+        """Continuously listens for incoming messages, logs them globally, and processes them."""
+        global_log_file = "global_message_log.json"
         while True:
             try:
                 msg = await self.websocket.recv()
                 data = json.loads(msg)
+                
+                # Append the received message to the global JSON log.
+                try:
+                    if os.path.exists(global_log_file):
+                        with open(global_log_file, "r") as f:
+                            global_log = json.load(f)
+                            if not isinstance(global_log, list):
+                                global_log = []
+                    else:
+                        global_log = []
+                except Exception as e:
+                    logger.error(f"Error reading global log: {e}")
+                    global_log = []
+                
+                global_log.append(data)
+                try:
+                    with open(global_log_file, "w") as f:
+                        json.dump(global_log, f, indent=4)
+                except Exception as e:
+                    logger.error(f"Error writing global log: {e}")
+                
                 logger.info(f"[{self.channel_type.upper()}] Received message: {data}")
                 await self.handle_message(data)
             except Exception as e:
@@ -131,7 +160,7 @@ class BaseWSSClient:
         await self.connect()
         await self.subscribe()
         await self.listen()
-
+ 
 # --- OrderSender Class ---
 class OrderSender:
     """
@@ -160,17 +189,18 @@ class OrderSender:
             logger.error(f"OrderSender: Failed to send order for token {token_id}: {e}")
             return {"status": "error", "token_id": token_id, "error": str(e)}
 
-# --- MarketWSSClient Class ---
+
+
 class MarketWSSClient(BaseWSSClient):
     """
     MarketWSSClient handles the public market channel.
-    
+
     Subscription Message:
       {
           "assets_ids": [ <list of token IDs> ],
           "type": "market"
       }
-    
+
     Investment Strategy (New):
       For each token, the strategy does the following:
         1. Extract the best ask price/size and, if available, the second-best ask.
@@ -181,7 +211,7 @@ class MarketWSSClient(BaseWSSClient):
         4. If the total is less than 100, determine an optimal uniform order size,
            which is the minimum candidate size among tokens.
         5. Log the order details to a JSON file and simulate sending orders via OrderSender.
-    
+      
     Internal Data Storage:
       For each token (asset_id), data is stored as:
       {
@@ -214,24 +244,44 @@ class MarketWSSClient(BaseWSSClient):
             "type": "market"
         }
 
-    def extract_best_levels(self, levels):
+    def extract_best_level(self, levels, is_ask=True):
         """
         Given a list of order levels (each with "price" and "size"),
-        returns a tuple: (best_price, best_size, second_best_price, second_best_size).
-        If levels is empty, returns empty strings.
+        returns a tuple: (best_price, best_size).
+        For asks (is_ask=True), the best level is the one with the lowest price;
+        for bids (is_ask=False), the best level is the one with the highest price.
+        If levels is empty or invalid, returns empty strings.
         """
         if not levels or not isinstance(levels, list):
-            return "", "", "", ""
-        best = levels[0]
-        best_price = best.get("price", "")
-        best_size = best.get("size", "")
-        if len(levels) >= 2:
-            second = levels[1]
-            second_best_price = second.get("price", "")
-            second_best_size = second.get("size", "")
-        else:
-            second_best_price, second_best_size = "", ""
-        return best_price, best_size, second_best_price, second_best_size
+            return "", ""
+        best_level = None
+        for level in levels:
+            try:
+                price = float(level.get("price", 0))
+                size = float(level.get("size", 0))
+            except Exception:
+                continue
+
+            if best_level is None:
+                best_level = level
+            else:
+                try:
+                    best_price = float(best_level.get("price", 0))
+                    best_size = float(best_level.get("size", 0))
+                except Exception:
+                    best_price, best_size = 0, 0
+
+                if is_ask:
+                    # For asks, lower price is better. If equal, higher size is preferred.
+                    if price < best_price or (price == best_price and size > best_size):
+                        best_level = level
+                else:
+                    # For bids, higher price is better. If equal, higher size is preferred.
+                    if price > best_price or (price == best_price and size > best_size):
+                        best_level = level
+        if best_level is None:
+            return "", ""
+        return best_level.get("price", ""), best_level.get("size", "")
 
     async def handle_message(self, message):
         # Process each message in a list, if applicable.
@@ -254,12 +304,8 @@ class MarketWSSClient(BaseWSSClient):
                 "timestamp": timestamp,
                 "best_buys": [""],
                 "best_buys_size": [""],
-                "second_best_buys": [""],
-                "second_best_buys_size": [""],
                 "best_sells": [""],
                 "best_sells_size": [""],
-                "second_best_sells": [""],
-                "second_best_sells_size": [""],
                 "logs": {},
                 "old_tick_size": "0.01",
                 "new_tick_size": "0.01"
@@ -271,22 +317,19 @@ class MarketWSSClient(BaseWSSClient):
             market = message.get("market", self.token_data[asset_id].get("market", ""))
             bids = message.get("bids", [])
             asks = message.get("asks", [])
-            best_bid, best_bid_size, second_best_bid, second_best_bid_size = self.extract_best_levels(bids)
-            best_sell, best_sell_size, second_best_sell, second_best_sell_size = self.extract_best_levels(asks)
+            # For bids, get the highest price; for asks, get the lowest price.
+            best_bid, best_bid_size = self.extract_best_level(bids, is_ask=False)
+            best_sell, best_sell_size = self.extract_best_level(asks, is_ask=True)
             self.token_data[asset_id].update({
                 "market": market,
                 "timestamp": timestamp,
                 "best_buys": [best_bid],
                 "best_buys_size": [best_bid_size],
-                "second_best_buys": [second_best_bid],
-                "second_best_buys_size": [second_best_bid_size],
                 "best_sells": [best_sell],
-                "best_sells_size": [best_sell_size],
-                "second_best_sells": [second_best_sell],
-                "second_best_sells_size": [second_best_sell_size]
+                "best_sells_size": [best_sell_size]
             })
             logger.info(f"[MARKET BOOK] Updated data for asset {asset_id}: {self.token_data[asset_id]}")
-            # Call the new investment strategy.
+            # Call the investment strategy after processing the book update.
             await self.execute_investment_strategy()
         elif event_type == "price_change":
             changes = message.get("changes", [])
@@ -298,31 +341,40 @@ class MarketWSSClient(BaseWSSClient):
                 change_size = change.get("size", "")
                 side = change.get("side", "").upper()
                 if side == "SELL":
-                    current_best_sell = self.token_data[asset_id].get("best_sells", [""])[0]
+                    # Update best ask if new price is lower or if equal price but higher size.
+                    current_best_sell_str = self.token_data[asset_id].get("best_sells", [""])[0]
                     try:
-                        current_best_sell_val = float(current_best_sell) if current_best_sell != "" else None
+                        current_best_sell_val = float(current_best_sell_str) if current_best_sell_str != "" else None
+                        current_best_sell_size = float(self.token_data[asset_id].get("best_sells_size", ["0"])[0])
                     except Exception:
-                        current_best_sell_val = None
-                    if current_best_sell_val is None or change_price < current_best_sell_val:
-                        self.token_data[asset_id]["second_best_sells"] = self.token_data[asset_id]["best_sells"]
-                        self.token_data[asset_id]["second_best_sells_size"] = self.token_data[asset_id]["best_sells_size"]
+                        current_best_sell_val, current_best_sell_size = None, 0
+                    try:
+                        new_size = float(change_size) if change_size != "" else 0
+                    except Exception:
+                        new_size = 0
+                    if current_best_sell_val is None or change_price < current_best_sell_val or (change_price == current_best_sell_val and new_size > current_best_sell_size):
                         self.token_data[asset_id]["best_sells"] = [str(change_price)]
-                        self.token_data[asset_id]["best_sells_size"] = [change_size]
+                        self.token_data[asset_id]["best_sells_size"] = [str(change_size)]
                         logger.info(f"[MARKET PRICE CHANGE] Updated best sells for asset {asset_id} to {change_price} with size {change_size}")
                 elif side == "BUY":
-                    current_best_bid = self.token_data[asset_id].get("best_buys", [""])[0]
+                    # Update best bid if new price is higher or if equal price but higher size.
+                    current_best_bid_str = self.token_data[asset_id].get("best_buys", [""])[0]
                     try:
-                        current_best_bid_val = float(current_best_bid) if current_best_bid != "" else None
+                        current_best_bid_val = float(current_best_bid_str) if current_best_bid_str != "" else None
+                        current_best_bid_size = float(self.token_data[asset_id].get("best_buys_size", ["0"])[0])
                     except Exception:
-                        current_best_bid_val = None
-                    if current_best_bid_val is None or change_price > current_best_bid_val:
-                        self.token_data[asset_id]["second_best_buys"] = self.token_data[asset_id]["best_buys"]
-                        self.token_data[asset_id]["second_best_buys_size"] = self.token_data[asset_id]["best_buys_size"]
+                        current_best_bid_val, current_best_bid_size = None, 0
+                    try:
+                        new_size = float(change_size) if change_size != "" else 0
+                    except Exception:
+                        new_size = 0
+                    if current_best_bid_val is None or change_price > current_best_bid_val or (change_price == current_best_bid_val and new_size > current_best_bid_size):
                         self.token_data[asset_id]["best_buys"] = [str(change_price)]
-                        self.token_data[asset_id]["best_buys_size"] = [change_size]
+                        self.token_data[asset_id]["best_buys_size"] = [str(change_size)]
                         logger.info(f"[MARKET PRICE CHANGE] Updated best buys for asset {asset_id} to {change_price} with size {change_size}")
             self.token_data[asset_id]["timestamp"] = timestamp
             logger.info(f"[MARKET PRICE CHANGE] Processed price change for asset {asset_id}.")
+            await self.execute_investment_strategy()
         elif event_type == "tick_size_change":
             old_tick = message.get("old_tick_size", "0.01")
             new_tick = message.get("new_tick_size", "0.01")
@@ -335,7 +387,6 @@ class MarketWSSClient(BaseWSSClient):
         else:
             logger.info(f"[MARKET] Unhandled message type: {event_type}")
 
-
     async def execute_investment_strategy(self):
         """
         For each token, calculate the best execution price and available size (combining best and, if available, second-best asks).
@@ -343,15 +394,15 @@ class MarketWSSClient(BaseWSSClient):
         The optimal size is chosen as the minimum available size among tokens (to ensure the same size can be executed for all).
         Finally, the orders (token id, price, optimal size) are wrapped into a single group (with a unique order id and timestamp),
         logged to a persistent JSON file (preserving previous orders), and orders are sent.
-        
-        Additionally, each call logs the token data (best sell price and size) along with the total sum for later analysis.
+
+        Additionally, detailed token data and total price are logged to an analysis JSON file.
         """
-        orders = []          # List to hold order data for each token
-        log_orders = []      # For logging the raw data for analysis
-        token_sizes = []     # List of best-sell sizes to determine the optimal size
+        orders = []             # List to hold order data for each token
+        log_orders = []         # For logging token data for later analysis
+        token_sizes = []        # List of best-sell sizes to determine the optimal size
         standalone_prices = {}  # Dictionary to keep track of each token's best sell price
 
-        # Process each token for best-sell details.
+        # Process each token's data.
         for token_id, data in self.token_data.items():
             try:
                 best_sell_price = (
@@ -364,18 +415,19 @@ class MarketWSSClient(BaseWSSClient):
                     if data.get("best_sells_size") and data["best_sells_size"][0] != ""
                     else None
                 )
-            except (KeyError, IndexError, ValueError):
+            except (KeyError, IndexError, ValueError) as e:
+                logger.error(f"Error processing token {token_id}: {e}")
                 continue
 
             if best_sell_price is None or best_sell_size is None:
                 continue
 
-            # Build the order for sending.
+            # Build order candidate.
             orders.append({
                 "token_id": token_id,
                 "price": best_sell_price,
-                "size": best_sell_size,      # Candidate size from best sell.
-                "optimal_size": None         # Will be determined later if arbitrage is detected.
+                "size": best_sell_size,      # Original candidate size.
+                "optimal_size": None         # To be determined if arbitrage opportunity is detected.
             })
             # Record data for analysis.
             log_orders.append({
@@ -386,7 +438,7 @@ class MarketWSSClient(BaseWSSClient):
             standalone_prices.setdefault(token_id, []).append({"price": best_sell_price})
             token_sizes.append(best_sell_size)
 
-        # Log analysis: save retrieved data for each token.
+        # Log detailed analysis data.
         analysis_log_file = "analysis_log.json"
         try:
             if os.path.exists(analysis_log_file):
@@ -400,8 +452,7 @@ class MarketWSSClient(BaseWSSClient):
             logger.error(f"Error reading analysis log: {e}")
             analysis_data = []
 
-        call_timestamp = datetime.utcnow().isoformat() + "Z"
-        # For this call, record the individual token data (log_orders) and leave total_price empty for now.
+        call_timestamp = datetime.now().isoformat() + "Z"
         analysis_entry = {
             "timestamp": call_timestamp,
             "log_orders": log_orders,
@@ -409,15 +460,13 @@ class MarketWSSClient(BaseWSSClient):
         }
         analysis_data.append(analysis_entry)
 
-        # Sum all best-sell prices.
+        # Sum best sell prices.
         total_price = sum(
             entry["price"]
             for price_list in standalone_prices.values()
             for entry in price_list
         )
         logger.info(f"Total price across tokens: {total_price}")
-
-        # Update the analysis entry with the total price.
         analysis_data[-1]["total_price"] = total_price
 
         try:
@@ -427,18 +476,14 @@ class MarketWSSClient(BaseWSSClient):
         except Exception as e:
             logger.error(f"Error saving analysis log: {e}")
 
-        # If an arbitrage opportunity is detected (total price less than 100)...
+        # Check if arbitrage opportunity is detected.
         if total_price < 100 and orders:
             logger.info("Arbitrage opportunity detected. Calculating optimal size...")
-            # Determine optimal size: minimum available best-sell size.
             optimal_size = min(token_sizes) if token_sizes else 0
 
             # Update each order with the computed optimal size.
             for order in orders:
                 order["optimal_size"] = optimal_size
-
-            # (Optional) Here you could combine second-best sell data for further refinement.
-            # For simplicity, we'll assume the best sell data is used.
 
             # Generate unique order id and timestamp.
             order_id = str(uuid.uuid4())
@@ -450,7 +495,7 @@ class MarketWSSClient(BaseWSSClient):
                 "orders": orders
             }
 
-            # Append the wrapped order to the persistent JSON log (preserving previous orders).
+            # Persist order log.
             log_file = "order_log.json"
             try:
                 if os.path.exists(log_file):
@@ -472,13 +517,13 @@ class MarketWSSClient(BaseWSSClient):
             except Exception as e:
                 logger.error(f"Error saving order log: {e}")
 
-            # Send orders asynchronously using OrderSender.
+            # Simulate sending orders asynchronously using OrderSender.
             send_tasks = []
             for order in orders:
                 token_id = order["token_id"]
                 order_size = order["optimal_size"]
                 order_price = order["price"]
-                # Mark the order as weighted if the candidate size differs from the optimal size.
+                # Mark as weighted if the candidate size differs from the optimal size.
                 weighted = order["size"] != order["optimal_size"]
                 send_tasks.append(OrderSender.send_order(token_id, order_size, order_price, weighted))
             responses = await asyncio.gather(*send_tasks)
@@ -487,28 +532,28 @@ class MarketWSSClient(BaseWSSClient):
             logger.info("No arbitrage opportunity detected based on current prices.")
 
     async def save_token_data(self, filepath="market_data.json", interval=5):
-            """
-            Periodically saves the internal token_data to a JSON file.
-            """
-            while True:
-                try:
-                    with open(filepath, "w") as f:
-                        json.dump(self.token_data, f, indent=2)
-                    logger.info(f"Saved token data to {filepath}.")
-                except Exception as e:
-                    logger.error(f"Error saving token data: {e}")
-                await asyncio.sleep(interval)
+        """
+        Periodically saves the internal token_data to a JSON file.
+        """
+        while True:
+            try:
+                with open(filepath, "w") as f:
+                    json.dump(self.token_data, f, indent=2)
+                logger.info(f"Saved token data to {filepath}.")
+            except Exception as e:
+                logger.error(f"Error saving token data: {e}")
+            await asyncio.sleep(interval)
 
     async def run(self):
-            """
-            Connects, subscribes, listens, and concurrently saves token data.
-            """
-            await self.connect()
-            await self.subscribe()
-            await asyncio.gather(
-                self.listen(),
-                self.save_token_data()
-            )
+        """
+        Connects, subscribes, listens, and concurrently saves token data.
+        """
+        await self.connect()
+        await self.subscribe()
+        await asyncio.gather(
+            self.listen(),
+            self.save_token_data()
+        )
 
 # --- UserWSSClient Class ---
 class UserWSSClient(BaseWSSClient):
