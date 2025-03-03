@@ -295,23 +295,151 @@ class UserMessageHandler:
                 logger.error(f"Error writing to {self.file_path}: {e}")
         return extracted
 
-# ---------- Trade Message Handler ----------
+# ------------------ MakerOrder and Trade Message Handler ------------------
+
+class MakerOrder:
+    """
+    Represents a single maker order in a trade message.
+    
+    Fields:
+      - asset_id: asset id of the maker order.
+      - matched_amount: amount of maker order matched.
+      - order_id: maker order ID.
+      - outcome: outcome.
+      - owner: owner of maker order.
+      - price: price of maker order.
+    """
+    def __init__(self, data):
+        try:
+            self.asset_id = data.get("asset_id")
+            self.matched_amount = data.get("matched_amount")
+            self.order_id = data.get("order_id")
+            self.outcome = data.get("outcome")
+            self.owner = data.get("owner")
+            self.price = data.get("price")
+        except Exception as e:
+            logger.error(f"Error parsing MakerOrder: {e}")
+
+    def to_dict(self):
+        return {
+            "asset_id": self.asset_id,
+            "matched_amount": self.matched_amount,
+            "order_id": self.order_id,
+            "outcome": self.outcome,
+            "owner": self.owner,
+            "price": self.price
+        }
+
+    def __repr__(self):
+        return f"MakerOrder(order_id={self.order_id}, price={self.price}, matched_amount={self.matched_amount})"
+
+class TradeMessage:
+    """
+    Parses a "trade" message.
+    """
+    def __init__(self, message):
+        self.asset_id = message.get("asset_id")
+        self.event_type = message.get("event_type")
+        self.trade_id = message.get("id")
+        self.last_update = message.get("last_update")
+        self.market = message.get("market")
+        self.matchtime = message.get("matchtime")
+        self.outcome = message.get("outcome")
+        self.owner = message.get("owner")
+        self.price = message.get("price")
+        self.side = message.get("side")
+        self.size = message.get("size")
+        self.status = message.get("status")
+        self.taker_order_id = message.get("taker_order_id")
+        self.timestamp = message.get("timestamp")
+        self.trade_owner = message.get("trade_owner")
+        self.type = message.get("type")
+        # Parse maker_orders field: can be a list or a single dict.
+        self.maker_orders = self._parse_maker_orders(message.get("maker_orders"))
+
+    def _parse_maker_orders(self, data):
+        orders = []
+        if isinstance(data, list):
+            for item in data:
+                try:
+                    orders.append(MakerOrder(item))
+                except Exception as e:
+                    logger.error(f"Error parsing maker order: {e}")
+        elif isinstance(data, dict):
+            try:
+                orders.append(MakerOrder(data))
+            except Exception as e:
+                logger.error(f"Error parsing maker order dict: {e}")
+        else:
+            logger.warning(f"Unexpected type for maker_orders: {type(data)}")
+        return orders
+
+    def get_maker_order_fields(self, order_id, fields):
+        """
+        Given an order_id and a list of fields, returns a dictionary with the requested values.
+        If the order is not found, returns None.
+        """
+        for order in self.maker_orders:
+            if order.order_id == order_id:
+                result = {}
+                for field in fields:
+                    result[field] = getattr(order, field, None)
+                return result
+        return None
+
+    def __repr__(self):
+        return (f"TradeMessage(trade_id={self.trade_id}, asset_id={self.asset_id}, price={self.price}, "
+                f"side={self.side}, size={self.size}, status={self.status}, maker_orders={self.maker_orders})")
 
 class TradeMessageHandler(UserMessageHandler):
     def __init__(self, save_to_file=False, file_path="trade_messages.json"):
-        # Define the fields we care about in a trade message.
         fields = [
-            "asset_id", "event_type", "id", "last_update", "maker_orders",
-            "market", "matchtime", "outcome", "owner", "price",
-            "side", "size", "status", "taker_order_id", "timestamp", "trade_owner", "type"
+            "asset_id", "event_type", "id", "last_update", "market",
+            "matchtime", "outcome", "owner", "price", "side",
+            "size", "status", "taker_order_id", "timestamp", "trade_owner", "type", "maker_orders"
         ]
         super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
+    
+    def process(self, message):
+        trade_msg = TradeMessage(message)
+        result = {
+            "trade_id": trade_msg.trade_id,
+            "asset_id": trade_msg.asset_id,
+            "price": trade_msg.price,
+            "side": trade_msg.side,
+            "size": trade_msg.size,
+            "status": trade_msg.status,
+            "maker_orders": [order.to_dict() for order in trade_msg.maker_orders]
+        }
+        if self.save_to_file and self.file_path:
+            try:
+                data = []
+                if os.path.exists(self.file_path):
+                    with open(self.file_path, "r") as f:
+                        data = json.load(f)
+                        if not isinstance(data, list):
+                            data = []
+                data.append(result)
+                with open(self.file_path, "w") as f:
+                    json.dump(data, f, indent=4)
+            except Exception as e:
+                logger.error(f"Error writing trade message log: {e}")
+        return trade_msg
+    
+class OrderMessageHandler(UserMessageHandler):
+    def __init__(self, save_to_file=False, file_path="order_messages.json"):
+        fields = [
+            "asset_id", "associate_trades", "event_type", "id", "market",
+            "order_owner", "original_size", "outcome", "owner", "price",
+            "side", "size_matched", "timestamp", "type"
+        ]
+        super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
+
 
 # ---------- Order Message Handler ----------
 
 class OrderMessageHandler(UserMessageHandler):
     def __init__(self, save_to_file=False, file_path="order_messages.json"):
-        # Define the fields we care about in an order message.
         fields = [
             "asset_id", "associate_trades", "event_type", "id", "market",
             "order_owner", "original_size", "outcome", "owner", "price",
