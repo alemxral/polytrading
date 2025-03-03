@@ -1,0 +1,418 @@
+```markdown
+# WebSocket API Documentation
+
+## Overview
+
+The Polymarket CLOP API provides WebSocket (WSS) channels through which clients can receive real-time updates. These endpoints allow clients to maintain near real-time views of their orders, trades, and general market activity. There are two available channels: `user` and `market`.
+
+---
+
+## Subscription
+
+To subscribe, send a message containing the following authentication and intent information upon opening the connection:
+
+| Field       | Type      | Description                                                                 |
+|-------------|-----------|-----------------------------------------------------------------------------|
+| `auth`      | `Auth`    | See [WSS Authentication](#wss-authentication)                               |
+| `markets`   | `string[]`| Array of markets (condition IDs) to receive events for (for `user` channel) |
+| `assets_ids`| `string[]`| Array of asset IDs (token IDs) to receive events for (for `market` channel) |
+| `type`      | `string`  | ID of channel to subscribe to (`User` or `Market`)                          |
+
+The `auth` field is of type `Auth`, which has the form described in the [WSS Authentication](#wss-authentication) section below.
+
+---
+
+## WSS Authentication
+
+Only connections to the `user` channel require authentication.
+
+| Field        | Optional | Description                              |
+|--------------|----------|------------------------------------------|
+| `apiKey`     | Yes      | Polygon account's CLOB API key           |
+| `secret`     | Yes      | Polygon account's CLOB API secret        |
+| `passphrase` | Yes      | Polygon account's CLOB API passphrase    |
+
+---
+
+## User Channel
+
+Authenticated channel for updates related to user activities (orders, trades), filtered for the authenticated user (by `apiKey`).
+
+### SUBSCRIBE `{wss-channel} user`
+
+#### `trade` Message
+
+```json
+{
+  "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+  "event_type": "trade",
+  "id": "28c4d2eb-bbea-40e7-a9f0-b2fdb56b2c2e",
+  "last_update": "1672290701",
+  "maker_orders": [
+    {
+      "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+      "matched_amount": "10",
+      "order_id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+      "outcome": "YES",
+      "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+      "price": "0.57"
+    }
+  ],
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "matchtime": "1672290701",
+  "outcome": "YES",
+  "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "price": "0.57",
+  "side": "BUY",
+  "size": "10",
+  "status": "MATCHED",
+  "taker_order_id": "0x06bc63e346ed4ceddce9efd6b3af37c8f8f440c92fe7da6b2d0f9e4ccbc50c42",
+  "timestamp": "1672290701",
+  "trade_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "type": "TRADE"
+}
+```
+
+**Emitted When:**
+- A market order is matched (`"MATCHED"`).
+- A limit order for a user is included in a trade (`"MATCHED"`).
+- Subsequent status changes for trade (`"MINED"`, `"CONFIRMED"`, `"RETRYING"`, `"FAILED"`).
+
+**Structure:**
+
+| Name            | Type          | Description                                                |
+|-----------------|---------------|------------------------------------------------------------|
+| `asset_id`      | `string`      | Asset ID (token ID) of taker order (market order).         |
+| `event_type`    | `string`      | `"trade"`.                                                 |
+| `id`            | `string`      | Trade ID.                                                  |
+| `last_update`   | `string`      | Time of last update to trade.                              |
+| `maker_orders`  | `MakerOrder[]`| Array of maker order match details.                        |
+| `market`        | `string`      | Market identifier (condition ID).                          |
+| `matchtime`     | `string`      | Time trade was matched.                                    |
+| `outcome`       | `string`      | Outcome.                                                   |
+| `owner`         | `string`      | API key of event owner.                                    |
+| `price`         | `string`      | Price.                                                     |
+| `side`          | `string`      | `BUY`/`SELL`.                                              |
+| `size`          | `string`      | Size.                                                      |
+| `status`        | `string`      | Trade status.                                              |
+| `taker_order_id`| `string`      | ID of taker order.                                         |
+| `timestamp`     | `string`      | Time of event.                                             |
+| `trade_owner`   | `string`      | API key of trade owner.                                    |
+| `type`          | `string`      | `"TRADE"`.                                                 |
+
+**MakerOrder Object:**
+
+| Name            | Type     | Description                                      |
+|-----------------|----------|--------------------------------------------------|
+| `asset_id`      | `string` | Asset ID of the maker order.                     |
+| `matched_amount`| `string` | Amount of maker order matched in trade.          |
+| `order_id`      | `string` | Maker order ID.                                  |
+| `outcome`       | `string` | Outcome.                                         |
+| `owner`         | `string` | Owner of maker order.                            |
+| `price`         | `string` | Price of maker order.                            |
+
+---
+
+#### `order` Message
+
+```json
+{
+  "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+  "associate_trades": null,
+  "event_type": "order",
+  "id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "order_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "original_size": "10",
+  "outcome": "YES",
+  "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "price": "0.57",
+  "side": "SELL",
+  "size_matched": "0",
+  "timestamp": "1672290687",
+  "type": "PLACEMENT"
+}
+```
+
+**Emitted When:**
+- An order is placed (`PLACEMENT`).
+- An order is updated (some of it is matched) (`UPDATE`).
+- An order is cancelled (`CANCELLATION`).
+
+**Structure:**
+
+| Name             | Type     | Description                                       |
+|------------------|----------|---------------------------------------------------|
+| `asset_id`       | `string` | Asset ID (token ID) of order.                     |
+| `associate_trades`| `string[]`| Array of IDs referencing trades the order is in. |
+| `event_type`     | `string` | `"order"`.                                        |
+| `id`             | `string` | Order ID.                                         |
+| `market`         | `string` | Condition ID of market.                           |
+| `order_owner`    | `string` | Owner of order.                                   |
+| `original_size`  | `string` | Original order size.                              |
+| `outcome`        | `string` | Outcome string.                                   |
+| `owner`          | `string` | Owner of order.                                   |
+| `price`          | `string` | Price of order.                                   |
+| `side`           | `string` | `BUY`/`SELL`.                                     |
+| `size_matched`   | `string` | Size of order that has been matched.              |
+| `timestamp`      | `string` | Time of event.                                    |
+| `type`           | `string` | `PLACEMENT`/`UPDATE`/`CANCELLATION`.              |
+
+---
+
+## Market Channel
+
+Public channel for updates related to market updates (level 2 price data).
+
+### SUBSCRIBE `{wss-channel} market`
+
+#### `book` Message
+
+```json
+{
+  "event_type": "book",
+  "asset_id": "65818619657568813474341868652308942079804919287380422192892211131408793125422",
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "buys": [
+    { "price": ".48", "size": "30" },
+    { "price": ".49", "size": "20" },
+    { "price": ".50", "size": "15" }
+  ],
+  "sells": [
+    { "price": ".52", "size": "25" },
+    { "price": ".53", "size": "60" },
+    { "price": ".54", "size": "10" }
+  ],
+  "timestamp": "123456789000",
+  "hash": "0x0...."
+}
+```
+
+**Emitted When:**
+- First subscribed to market.
+- A trade affects the book.
+
+**Structure:**
+
+| Name       | Type          | Description                                           |
+|------------|---------------|-------------------------------------------------------|
+| `event_type`| `string`     | `"book"`.                                             |
+| `asset_id`  | `string`     | Asset ID (token ID).                                  |
+| `market`    | `string`     | Condition ID of market.                               |
+| `timestamp` | `string`     | Unix timestamp of current book generation (ms).       |
+| `hash`      | `string`     | Hash summary of the orderbook content.                |
+| `buys`      | `OrderSummary[]`| List of aggregate book levels for buys.            |
+| `sells`     | `OrderSummary[]`| List of aggregate book levels for sells.           |
+
+**OrderSummary Object:**
+
+| Name   | Type     | Description                      |
+|--------|----------|----------------------------------|
+| `price`| `string` | Price of the orderbook level.    |
+| `size` | `string` | Size available at that price.    |
+
+---
+
+#### `price_change` Message
+
+```json
+{
+  "asset_id": "71321045679252212594626385532706912750332728571942532289631379312455583992563",
+  "changes": [
+    {
+      "price": "0.4",
+      "side": "SELL",
+      "size": "3300"
+    },
+    {
+      "price": "0.5",
+      "side": "SELL",
+      "size": "3400"
+    },
+    {
+      "price": "0.3",
+      "side": "SELL",
+      "size": "3400"
+    }
+  ],
+  "event_type": "price_change",
+  "market": "0x5f65177b394277fd294cd75650044e32ba009a95022d88a0c1d565897d72f8f1",
+  "timestamp": "1729084877448",
+  "hash": "3cd4d61e042c81560c9037ece0c61f3b1a8fbbdd"
+}
+```
+
+**Emitted When:**
+- A new order is placed.
+- An order is cancelled.
+
+**Structure:**
+
+| Name       | Type     | Description                                |
+|------------|----------|--------------------------------------------|
+| `event_type`| `string`| `"price_change"`.                          |
+| `asset_id`  | `string`| Asset ID (token ID).                       |
+| `market`    | `string`| Condition ID of market.                    |
+| `price`     | `string`| Price level affected.                      |
+| `size`      | `string`| New aggregate size for price level.        |
+| `side`      | `string`| `BUY`/`SELL`.                              |
+| `timestamp` | `string`| Time of event.                             |
+
+---
+
+#### `tick_size_change` Message
+
+```json
+{
+  "event_type": "tick_size_change",
+  "asset_id": "65818619657568813474341868652308942079804919287380422192892211131408793125422",
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "old_tick_size": "0.01",
+  "new_tick_size": "0.001",
+  "timestamp": "100000000"
+}
+```
+
+**Emitted When:**
+- The minimum tick size of the market changes (when the book's price reaches limits: `price > 0.96` or `price < 0.04`).
+
+**Structure:**
+
+| Name           | Type     | Description                              |
+|----------------|----------|------------------------------------------|
+| `event_type`   | `string` | `"tick_size_change"`.                    |
+| `asset_id`     | `string` | Asset ID (token ID).                     |
+| `market`       | `string` | Condition ID of market.                  |
+| `old_tick_size`| `string` | Previous minimum tick size.              |
+| `new_tick_size`| `string` | Current minimum tick size.               |
+| `timestamp`    | `string` | Time of event.                           |
+
+---
+
+```markdown
+# User Channel
+
+Authenticated channel for updates related to user activities (orders, trades), filtered for the authenticated user (by `apiKey`).
+
+---
+
+## SUBSCRIBE `{wss-channel} user`
+
+### `trade` Message
+
+```json
+{
+  "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+  "event_type": "trade",
+  "id": "28c4d2eb-bbea-40e7-a9f0-b2fdb56b2c2e",
+  "last_update": "1672290701",
+  "maker_orders": [
+    {
+      "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+      "matched_amount": "10",
+      "order_id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+      "outcome": "YES",
+      "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+      "price": "0.57"
+    }
+  ],
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "matchtime": "1672290701",
+  "outcome": "YES",
+  "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "price": "0.57",
+  "side": "BUY",
+  "size": "10",
+  "status": "MATCHED",
+  "taker_order_id": "0x06bc63e346ed4ceddce9efd6b3af37c8f8f440c92fe7da6b2d0f9e4ccbc50c42",
+  "timestamp": "1672290701",
+  "trade_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "type": "TRADE"
+}
+```
+
+**Emitted When:**
+- A market order is matched (`"MATCHED"`).
+- A limit order for a user is included in a trade (`"MATCHED"`).
+- Subsequent status changes for trade (`"MINED"`, `"CONFIRMED"`, `"RETRYING"`, `"FAILED"`).
+
+**Structure:**
+
+| Name            | Type          | Description                                                |
+|-----------------|---------------|------------------------------------------------------------|
+| `asset_id`      | `string`      | Asset ID (token ID) of taker order (market order).         |
+| `event_type`    | `string`      | `"trade"`.                                                 |
+| `id`            | `string`      | Trade ID.                                                  |
+| `last_update`   | `string`      | Time of last update to trade.                              |
+| `maker_orders`  | `MakerOrder[]`| Array of maker order match details.                        |
+| `market`        | `string`      | Market identifier (condition ID).                          |
+| `matchtime`     | `string`      | Time trade was matched.                                    |
+| `outcome`       | `string`      | Outcome.                                                   |
+| `owner`         | `string`      | API key of event owner.                                    |
+| `price`         | `string`      | Price.                                                     |
+| `side`          | `string`      | `BUY`/`SELL`.                                              |
+| `size`          | `string`      | Size.                                                      |
+| `status`        | `string`      | Trade status.                                              |
+| `taker_order_id`| `string`      | ID of taker order.                                         |
+| `timestamp`     | `string`      | Time of event.                                             |
+| `trade_owner`   | `string`      | API key of trade owner.                                    |
+| `type`          | `string`      | `"TRADE"`.                                                 |
+
+**MakerOrder Object:**
+
+| Name            | Type     | Description                                      |
+|-----------------|----------|--------------------------------------------------|
+| `asset_id`      | `string` | Asset ID of the maker order.                     |
+| `matched_amount`| `string` | Amount of maker order matched in trade.          |
+| `order_id`      | `string` | Maker order ID.                                  |
+| `outcome`       | `string` | Outcome.                                         |
+| `owner`         | `string` | Owner of maker order.                            |
+| `price`         | `string` | Price of maker order.                            |
+
+---
+
+### `order` Message
+
+```json
+{
+  "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+  "associate_trades": null,
+  "event_type": "order",
+  "id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+  "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+  "order_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "original_size": "10",
+  "outcome": "YES",
+  "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+  "price": "0.57",
+  "side": "SELL",
+  "size_matched": "0",
+  "timestamp": "1672290687",
+  "type": "PLACEMENT"
+}
+```
+
+**Emitted When:**
+- An order is placed (`PLACEMENT`).
+- An order is updated (some of it is matched) (`UPDATE`).
+- An order is cancelled (`CANCELLATION`).
+
+**Structure:**
+
+| Name             | Type     | Description                                       |
+|------------------|----------|---------------------------------------------------|
+| `asset_id`       | `string` | Asset ID (token ID) of order.                     |
+| `associate_trades`| `string[]`| Array of IDs referencing trades the order is in. |
+| `event_type`     | `string` | `"order"`.                                        |
+| `id`             | `string` | Order ID.                                         |
+| `market`         | `string` | Condition ID of market.                           |
+| `order_owner`    | `string` | Owner of order.                                   |
+| `original_size`  | `string` | Original order size.                              |
+| `outcome`        | `string` | Outcome string.                                   |
+| `owner`          | `string` | Owner of order.                                   |
+| `price`          | `string` | Price of order.                                   |
+| `side`           | `string` | `BUY`/`SELL`.                                     |
+| `size_matched`   | `string` | Size of order that has been matched.              |
+| `timestamp`      | `string` | Time of event.                                    |
+| `type`           | `string` | `PLACEMENT`/`UPDATE`/`CANCELLATION`.              |
+```
