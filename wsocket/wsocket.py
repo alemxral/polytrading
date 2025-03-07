@@ -3,16 +3,19 @@ import websockets
 import json
 import logging
 import os
+from dotenv import load_dotenv
 from datetime import datetime
-from wsocket_handlers import (
+from wsocket.wsocket_handlers import (
     BookMessageHandler,
     PriceChangeMessageHandler,
     TickSizeChangeMessageHandler,
     LastTradePriceMessageHandler,
-    TradeMessageHandler,
-    OrderMessageHandler
+    TradeMessageHandler, 
+    OrderMessageHandler,
 )
 
+# Load environment variables
+load_dotenv()
 
 # --- Configuration & Logging ---
 logger = logging.getLogger("Wsockt")
@@ -79,9 +82,8 @@ class MarketWSSClient(BaseWSSClient):
     def __init__(self, assets_ids, ws_url=WS_MARKET_URL):
         super().__init__(ws_url, channel_type="market")
         self.assets_ids = assets_ids
-        # In-memory store for each asset's orderbook data.
+        # In-memory store for each asset's order book data.
         self.token_data = {}
-
         # Instantiate message handlers.
         self.book_handler = BookMessageHandler(save_to_file=True)
         self.price_change_handler = PriceChangeMessageHandler(save_to_file=True)
@@ -92,37 +94,70 @@ class MarketWSSClient(BaseWSSClient):
         return {"assets_ids": self.assets_ids, "type": "market"}
 
     async def handle_message(self, message):
+        # If the message is a list, iterate through each one.
+        if isinstance(message, list):
+            for m in message:
+                await self.handle_message(m)
+            return
+
         event_type = message.get("event_type")
         if event_type == "book":
             # Process a full book update.
-            result = self.book_handler.process(message)
-            logger.info(f"[BOOK] Processed: {result}")
+            book_msg = self.book_handler.process(message)
             asset_id = message.get("asset_id")
             if asset_id:
-                self.token_data[asset_id] = message  # Refresh token data.
+                self.token_data[asset_id] = book_msg
+            logger.info(f"[BOOK] Processed for asset {asset_id}: {book_msg}")
         elif event_type == "price_change":
-            result = self.price_change_handler.process(message)
-            logger.info(f"[PRICE_CHANGE] Processed: {result}")
+            asset_id = message.get("asset_id")
+            if asset_id in self.token_data and hasattr(self.token_data[asset_id], "update_price_change"):
+                self.token_data[asset_id].update_price_change(message)
+                logger.info(f"[PRICE_CHANGE] Updated book for asset {asset_id}.")
+            else:
+                # Fallback: create a new book message and update.
+                book_msg = self.book_handler.process(message)
+                if asset_id:
+                    self.token_data[asset_id] = book_msg
+                logger.info(f"[PRICE_CHANGE] Created new book for asset {asset_id} from price_change message.")
         elif event_type == "tick_size_change":
-            result = self.tick_size_handler.process(message)
-            logger.info(f"[TICK_SIZE_CHANGE] Processed: {result}")
+            asset_id = message.get("asset_id")
+            if asset_id in self.token_data and hasattr(self.token_data[asset_id], "update_tick_size_change"):
+                self.token_data[asset_id].update_tick_size_change(message)
+                logger.info(f"[TICK_SIZE_CHANGE] Updated tick size for asset {asset_id}.")
+            else:
+                book_msg = self.book_handler.process(message)
+                book_msg.update_tick_size_change(message)
+                if asset_id:
+                    self.token_data[asset_id] = book_msg
+                logger.info(f"[TICK_SIZE_CHANGE] Created new book for asset {asset_id} from tick_size_change message.")
         elif event_type == "last_trade_price":
-            result = self.last_trade_handler.process(message)
-            logger.info(f"[LAST_TRADE_PRICE] Processed: {result}")
+            asset_id = message.get("asset_id")
+            if asset_id in self.token_data and hasattr(self.token_data[asset_id], "update_last_trade_price"):
+                self.token_data[asset_id].update_last_trade_price(message)
+            else:
+                book_msg = self.book_handler.process(message)
+                book_msg.update_last_trade_price(message)
+                if asset_id:
+                    self.token_data[asset_id] = book_msg
+            logger.info(f"[LAST_TRADE_PRICE] Processed for asset {asset_id}.")
         else:
             logger.info(f"[MARKET] Unhandled event type: {event_type}")
 
 
 # --- User WebSocket Client ---
 class UserWSSClient(BaseWSSClient):
-    def __init__(self, markets, auth, ws_url=WS_USER_URL):
+    def __init__(self, markets, auth=None, ws_url=WS_USER_URL):
         super().__init__(ws_url, channel_type="user")
         self.markets = markets
+        # Load authentication from environment variables if not provided.
+        if auth is None:
+            auth = {
+                "api_key": os.getenv("API_KEY"),
+                "api_secret": os.getenv("API_SECRET"),
+                "api_passphrase": os.getenv("API_PASSPHRASE")
+            }
         self.auth = auth
-        # Dictionary to store user-related data (e.g. order book, trades)
         self.order_book_data = {}
-
-        # Instantiate handlers.
         self.trade_handler = TradeMessageHandler(save_to_file=True)
         self.order_handler = OrderMessageHandler(save_to_file=True)
 
@@ -130,11 +165,17 @@ class UserWSSClient(BaseWSSClient):
         return {"auth": self.auth, "markets": self.markets, "type": "user"}
 
     async def handle_message(self, message):
+        # If message is a list, process each message individually.
+        if isinstance(message, list):
+            for m in message:
+                await self.handle_message(m)
+            return
+
         event_type = message.get("event_type")
         if event_type == "trade":
             trade_msg = self.trade_handler.process(message)
             logger.info(f"[TRADE] Processed trade message: {trade_msg}")
-            # Example: query maker order details if needed.
+            # Example: you can query maker order fields:
             # maker_info = trade_msg.get_maker_order_fields(order_id, ["price", "owner"])
         elif event_type == "order":
             order_msg = self.order_handler.process(message)
@@ -146,28 +187,21 @@ class UserWSSClient(BaseWSSClient):
         else:
             logger.info(f"[USER] Unhandled event type: {event_type}")
 
-
-# --- Example Usage ---
+# -------------------- Example Usage --------------------
 if __name__ == "__main__":
-    # Example for Market channel
+    # To run the market client:
     market_assets = [
         "65818619657568813474341868652308942079804919287380422192892211131408793125422"
     ]
     market_client = MarketWSSClient(assets_ids=market_assets, ws_url=WS_MARKET_URL)
     
-    # To run the market client:
-    # asyncio.run(market_client.run())
-
-    # Example for User channel
-    user_markets = [
-        "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af"
-    ]
-    auth = {"apiKey": "your_api_key", "secret": "your_secret", "passphrase": "your_passphrase"}
-    user_client = UserWSSClient(markets=user_markets, auth=auth, ws_url=WS_USER_URL)
-    
-    # To run the user client (comment out one if testing individually)
-    # asyncio.run(user_client.run())
-    
-    # For demonstration, you could run one at a time:
+    # Uncomment to run market client:
     asyncio.run(market_client.run())
+    
+    # To run the user client, comment out the market client run above and use:
+    # user_markets = [
+    #     "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af"
+    # ]
+    # auth = {"api_key": "your_api_key", "secret": "your_secret", "api_passphrase": "your_passphrase"}
+    # user_client = UserWSSClient(markets=user_markets, auth=auth, ws_url=WS_USER_URL)
     # asyncio.run(user_client.run())

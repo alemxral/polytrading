@@ -1,13 +1,16 @@
-import json, os, logging
+import json
+import os
+import logging
 from datetime import datetime
 
 logger = logging.getLogger("MarketMessageHandler")
 logger.setLevel(logging.DEBUG)
 
+# ---------- Base Handler for Market Messages ----------
 class MarketMessageHandler:
     """
     Base class for market message handlers.
-
+    
     Parameters:
       - fields: List of fields to extract from the message.
       - save_to_file: Boolean flag; if True, save the processed message.
@@ -37,8 +40,8 @@ class MarketMessageHandler:
 
     def _parse_field(self, field):
         """
-        If field is a list, return it as is; if it's a dict, return a list with that dict.
-        Otherwise, return the field unchanged.
+        Ensures that the field is always returned as a list if it is a dict or list.
+        Otherwise, returns the field unchanged.
         """
         if isinstance(field, list):
             return field
@@ -47,14 +50,13 @@ class MarketMessageHandler:
         else:
             return field
 
-# ------------------ Book Message Handler ------------------
-
-
-
+# ---------- Book Message Handler and Related Classes ----------
 
 logger = logging.getLogger("BookMessage")
 logger.setLevel(logging.DEBUG)
+
 class OrderSummary:
+    """Represents one level of an order book."""
     def __init__(self, price, size):
         try:
             self.price = float(price)
@@ -70,7 +72,7 @@ class OrderSummary:
 
 class BookMessage:
     """
-    Represents a "book" message and supports updating via price_change or tick_size_change messages.
+    Represents a "book" message and supports updates via price_change or tick_size_change messages.
     """
     def __init__(self, message):
         self.event_type = message.get("event_type")
@@ -78,21 +80,15 @@ class BookMessage:
         self.market = message.get("market")
         self.timestamp = message.get("timestamp")
         self.hash = message.get("hash")
-        self.tick_size = 0.01  # default tick size; can be updated later.
+        self.tick_size = 0.01  # default tick size; can be updated
         self.buys = self._parse_order_summaries(message.get("buys"))
         self.sells = self._parse_order_summaries(message.get("sells"))
-        self.last_trade_price = None  # New field for last trade price
-        self.history = []  # time series for best prices
-
-    def update_last_trade_price(self, message):
-            try:
-                self.last_trade_price = float(message.get("price", self.last_trade_price or 0))
-                logger.info(f"[BookMessage] Last trade price updated to {self.last_trade_price} for asset {self.asset_id}")
-            except Exception as e:
-                logger.error(f"Error updating last trade price for asset {self.asset_id}: {e}")
+        self.last_trade_price = None  # last trade price (if provided)
+        self.history = []  # time series of best prices
 
     def _parse_order_summaries(self, data):
         summaries = []
+        # If data is a list, process each element; if it's a dict, wrap it.
         if isinstance(data, list):
             for item in data:
                 try:
@@ -105,15 +101,21 @@ class BookMessage:
             except Exception as e:
                 logger.error(f"Error parsing order summary from dict {data}: {e}")
         else:
-            logger.warning(f"Unexpected data type for order summaries: {type(data)}")
+            logger.warning(f"Unexpected type for order summaries: {type(data)}")
         return summaries
+
+    def update_last_trade_price(self, message):
+        try:
+            self.last_trade_price = float(message.get("price", self.last_trade_price or 0))
+            logger.info(f"[BookMessage] Last trade price updated to {self.last_trade_price} for asset {self.asset_id}")
+        except Exception as e:
+            logger.error(f"Error updating last trade price for asset {self.asset_id}: {e}")
 
     def update_price_change(self, message):
         """
         Updates the book with a price_change message.
-        Expects the message to have:
-          - changes: list of changes with "price", "side", "size"
-          - timestamp: update time
+        Expects message to have "changes" (a list of dicts with "price", "side", "size")
+        and a "timestamp".
         """
         changes = message.get("changes", [])
         for change in changes:
@@ -122,11 +124,10 @@ class BookMessage:
                 change_size = float(change.get("size", 0))
                 side = change.get("side", "").lower()
             except Exception as e:
-                logger.error(f"Error parsing change: {e}")
+                logger.error(f"Error parsing price change: {e}")
                 continue
 
             if side == "sell":
-                # Look for an existing order level (within a small tolerance)
                 updated = False
                 for order in self.sells:
                     if abs(order.price - change_price) < 0.0001:
@@ -154,8 +155,9 @@ class BookMessage:
             self.timestamp = message.get("timestamp", self.timestamp)
             logger.info(f"[BookMessage] Tick size updated to {self.tick_size} for asset {self.asset_id}")
         except Exception as e:
-            logger.error(f"Error updating tick size: {e}")
+            logger.error(f"Error updating tick size for asset {self.asset_id}: {e}")
 
+    # Additional helper functions:
     def get_total_size_for_side(self, side, price, tolerance=0.0001):
         total = 0.0
         side = side.lower()
@@ -199,10 +201,21 @@ class BookMessage:
     def get_time_series(self):
         return self.history
 
+    def get_top_buy_levels(self, n=1):
+        return sorted(self.buys, key=lambda o: o.price, reverse=True)[:n]
+
+    def get_top_sell_levels(self, n=1):
+        return sorted(self.sells, key=lambda o: o.price)[:n]
+
+    def aggregated_buy_size(self):
+        return sum(o.size for o in self.buys)
+
+    def aggregated_sell_size(self):
+        return sum(o.size for o in self.sells)
+
     def __repr__(self):
         return (f"BookMessage(asset_id={self.asset_id}, market={self.market}, timestamp={self.timestamp}, "
-                f"tick_size={self.tick_size}, buys={self.buys}, sells={self.sells})")
-    
+                f"tick_size={self.tick_size}, buys={self.buys}, sells={self.sells}, history={self.history})")
 
 class BookMessageHandler(MarketMessageHandler):
     def __init__(self, save_to_file=False, file_path="book_messages.json"):
@@ -211,16 +224,14 @@ class BookMessageHandler(MarketMessageHandler):
     
     def process(self, message):
         book_msg = BookMessage(message)
-        # For simplicity, extract the top 3 levels for buys and sells.
-        top_buys = [vars(o) for o in book_msg.get_top_buy_levels(3)]
-        top_sells = [vars(o) for o in book_msg.get_top_sell_levels(3)]
+        # For demonstration, extract the top 3 levels and aggregated sizes.
         result = {
             "asset_id": book_msg.asset_id,
             "market": book_msg.market,
             "timestamp": book_msg.timestamp,
             "hash": book_msg.hash,
-            "top_buys": top_buys,
-            "top_sells": top_sells,
+            "top_buys": [vars(o) for o in book_msg.get_top_buy_levels(3)],
+            "top_sells": [vars(o) for o in book_msg.get_top_sell_levels(3)],
             "aggregated_buy_size": book_msg.aggregated_buy_size(),
             "aggregated_sell_size": book_msg.aggregated_sell_size()
         }
@@ -239,38 +250,29 @@ class BookMessageHandler(MarketMessageHandler):
                 logger.error(f"Error writing book message log: {e}")
         return book_msg
 
-# ---------------- Price Change Message Handler ----------------
-
+# -------------------- Price Change Message Handler --------------------
 class PriceChangeMessageHandler(MarketMessageHandler):
     def __init__(self, save_to_file=False, file_path="price_change_messages.json"):
         fields = ["event_type", "asset_id", "market", "price", "size", "side", "timestamp", "hash"]
         super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
 
-# ---------------- Tick Size Change Message Handler ----------------
-
+# -------------------- Tick Size Change Message Handler --------------------
 class TickSizeChangeMessageHandler(MarketMessageHandler):
     def __init__(self, save_to_file=False, file_path="tick_size_change_messages.json"):
         fields = ["event_type", "asset_id", "market", "old_tick_size", "new_tick_size", "timestamp"]
         super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
 
-# ---------------- Last Trade Price Message Handler ----------------
-
+# -------------------- Last Trade Price Message Handler --------------------
 class LastTradePriceMessageHandler(MarketMessageHandler):
     def __init__(self, save_to_file=False, file_path="last_trade_price_messages.json"):
         fields = ["event_type", "asset_id", "market", "timestamp"]
         super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
 
-
-# ---------------- USER Message Handler ----------------
+# -------------------- User Channel Handlers --------------------
 
 class UserMessageHandler:
     """
     Base handler for user channel messages.
-    
-    Parameters:
-      - fields: List of fields to extract from the message.
-      - save_to_file: Boolean flag to determine if the processed message should be saved.
-      - file_path: JSON file path to which the message will be saved.
     """
     def __init__(self, fields=None, save_to_file=False, file_path=None):
         self.fields = fields or []
@@ -278,7 +280,6 @@ class UserMessageHandler:
         self.file_path = file_path
 
     def process(self, message):
-        # Extract only the specified fields.
         extracted = {field: message.get(field) for field in self.fields}
         if self.save_to_file and self.file_path:
             try:
@@ -295,19 +296,10 @@ class UserMessageHandler:
                 logger.error(f"Error writing to {self.file_path}: {e}")
         return extracted
 
-# ------------------ MakerOrder and Trade Message Handler ------------------
-
+# -------------------- MakerOrder and Trade Message Handler --------------------
 class MakerOrder:
     """
-    Represents a single maker order in a trade message.
-    
-    Fields:
-      - asset_id: asset id of the maker order.
-      - matched_amount: amount of maker order matched.
-      - order_id: maker order ID.
-      - outcome: outcome.
-      - owner: owner of maker order.
-      - price: price of maker order.
+    Represents a maker order in a trade message.
     """
     def __init__(self, data):
         try:
@@ -354,7 +346,6 @@ class TradeMessage:
         self.timestamp = message.get("timestamp")
         self.trade_owner = message.get("trade_owner")
         self.type = message.get("type")
-        # Parse maker_orders field: can be a list or a single dict.
         self.maker_orders = self._parse_maker_orders(message.get("maker_orders"))
 
     def _parse_maker_orders(self, data):
@@ -375,10 +366,6 @@ class TradeMessage:
         return orders
 
     def get_maker_order_fields(self, order_id, fields):
-        """
-        Given an order_id and a list of fields, returns a dictionary with the requested values.
-        If the order is not found, returns None.
-        """
         for order in self.maker_orders:
             if order.order_id == order_id:
                 result = {}
@@ -425,19 +412,8 @@ class TradeMessageHandler(UserMessageHandler):
             except Exception as e:
                 logger.error(f"Error writing trade message log: {e}")
         return trade_msg
-    
-class OrderMessageHandler(UserMessageHandler):
-    def __init__(self, save_to_file=False, file_path="order_messages.json"):
-        fields = [
-            "asset_id", "associate_trades", "event_type", "id", "market",
-            "order_owner", "original_size", "outcome", "owner", "price",
-            "side", "size_matched", "timestamp", "type"
-        ]
-        super().__init__(fields=fields, save_to_file=save_to_file, file_path=file_path)
 
-
-# ---------- Order Message Handler ----------
-
+# -------------------- Order Message Handler --------------------
 class OrderMessageHandler(UserMessageHandler):
     def __init__(self, save_to_file=False, file_path="order_messages.json"):
         fields = [
