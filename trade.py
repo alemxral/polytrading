@@ -1,7 +1,6 @@
 import logging
 import json
 import requests
-from ClobClientWrapper import default_client  # Pre-initialized client if needed elsewhere
 
 # Configure minimal logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

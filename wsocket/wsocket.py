@@ -2,9 +2,7 @@ import asyncio
 import websockets
 import json
 import logging
-import os
 from dotenv import load_dotenv
-from datetime import datetime
 from wsocket.wsocket_handlers import (
     BookMessageHandler,
     PriceChangeMessageHandler,
@@ -14,7 +12,7 @@ from wsocket.wsocket_handlers import (
     OrderMessageHandler,
 )
 
-# Load environment variables
+
 load_dotenv()
 
 # --- Configuration & Logging ---
