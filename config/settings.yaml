@@ -1,0 +1,7 @@
+endpoints:
+  rest: "https://clob.polymarket.com/"
+  data_api: "https://data-api.polymarket.com/"
+  websocket_market: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+  websocket_user: "wss://ws-subscriptions-clob.polymarket.com/ws/user"
+  rtds: "wss://ws-live-data.polymarket.com"
+signature_type: 0

@@ -1,11 +1,6 @@
-# Ignore sensitive config files
-config/credentials.json
-backend/config/credentials.json
-# Ignore environment files
-.env
-# Bytecode and cache
+# Python
 __pycache__/
 *.pyc
-# OS files
-.DS_Store
-Thumbs.db
+# Secrets
+config/credentials.json
+

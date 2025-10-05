@@ -1,0 +1,29 @@
+# Core dependencies
+python-dotenv
+pyyaml
+requests
+websockets
+
+# For async workflows and scheduling
+apscheduler
+
+# For Telegram notifications (optional)
+python-telegram-bot
+
+# For web UI (optional, e.g. with FastAPI)
+fastapi
+uvicorn
+
+# For testing
+pytest
+pytest-asyncio
+
+# For type checking (optional)
+types-requests
+types-PyYAML
+
+
+
+# PyPI package names
+py_clob_client
+python-order_utils
